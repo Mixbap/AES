@@ -61,6 +61,19 @@ Input_data_frame = 100; %value frame
 [ Input_data_full, Key_AES_full ] = aes_128_gen_indata_key(Input_data_frame*128);
 Input_data_length = Input_data_frame*16;
 
+%----Generate random massive input enable----------------------------------
+Input_enable = randi([1 3], 1, Input_data_length);
+
+%----Write input enable in file--------------------------------------------
+fen_in = fopen('../data/aes_128_enc_input_enable.dat', 'wb');
+fprintf(fen_in, '%d\n', Input_data_frame);
+
+for i = 0:Input_data_frame-1 
+    fprintf(fen_in, '%d\n', Input_enable(i+1));
+end
+
+fclose(fen_in);
+
 
 %----Write input data and keys in file-------------------------------------
 Input_data_hex_full = '';
