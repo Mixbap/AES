@@ -24,7 +24,16 @@ module aes_128_top
 	    input   [127:0]	    in_data,
 	    input			    in_en,
 	    input			    en_wr,
+
+        `ifdef ONE_KEY
 	    input	[127:0]	    key_round_wr,
+        `endif
+
+        `ifdef TWO_KEY
+        input   [63:0]      key_round_wr,
+        input               switch_key,
+        output              key_idx,
+        `endif
 	
 	    output	[127:0]	    out_data,
 	    output			    out_en,
@@ -35,7 +44,7 @@ module aes_128_top
 /**************************************************************************************************
  *      LOCAL PARAMETERS & VARIABLES                                                              *
  **************************************************************************************************/
-`ifdef ROUND_4CLK
+`ifdef TWO_KEY
 logic   [127:0]             round_data_buf  = 'd0;
 `endif
 
@@ -58,11 +67,11 @@ aes_128_subbytes_shiftrows
         .clk,
         .kill,
 
-    `ifdef ROUND_4CLK
+    `ifdef TWO_KEY
         .in_data (round_data_buf),
     `endif
 
-    `ifdef ROUND_3CLK
+    `ifdef ONE_KEY
         .in_data (round_data),
     `endif
 
@@ -91,11 +100,11 @@ always_ff @(posedge clk) begin
 		round_data <= mixcol_out ^ key_round;
 end
 
-`ifdef ROUND_3CLK
+`ifdef ONE_KEY
 assign out_data = round_data;
 `endif
 
-`ifdef ROUND_4CLK
+`ifdef TWO_KEY
 /* Delay buffer round data */
 always_ff @(posedge clk) begin
 	if (kill)
@@ -110,7 +119,7 @@ assign out_data = round_data_buf;
 /**************************************************************************************************
  *      AES CONTROL                                                                                *
  **************************************************************************************************/
-`ifdef ROUND_3CLK
+`ifdef ONE_KEY
 aes_128_control_3clk
 
     aes_128_control_3val
@@ -127,7 +136,21 @@ aes_128_control_3clk
     );
 `endif
 
-`ifdef ROUND_4CLK
+`ifdef TWO_KEY
+aes_128_control_4clk
+
+    aes_128_control_4val
+    (
+        .clk,
+        .kill,
+        .in_en,
+        .start (start),
+        .en_mixcol (en_mixcol),
+        .key_ready,
+        .idle,
+        .out_en,
+        .in_en_collision_irq_pulse
+    );
 `endif
 
 /**************************************************************************************************
@@ -136,7 +159,7 @@ aes_128_control_3clk
 `ifdef ONE_KEY
 aes_128_single_key
 
-    single_key
+    single_key_ram
     (
         .clk,
         .kill,
@@ -147,11 +170,20 @@ aes_128_single_key
     );
 `endif
 
-`ifdef TWO_KEY_SWITCH
-`endif
+`ifdef TWO_KEY
+aes_128_switch_key
 
-`ifdef TWO_KEY_AUTO
+    switch_key_ram
+    (
+        .clk,
+        .kill,
+        .en_wr,
+        .key_round_wr,
+        .key_ready,
+        .switch_key,
+        .key_round_rd (key_round),
+        .key_idx
+    );
 `endif
-
 
 endmodule : aes_128_top

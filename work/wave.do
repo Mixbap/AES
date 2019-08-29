@@ -8,8 +8,10 @@ add wave -radix hexadecimal -group TESTBENCH sim:/aes_128_top_tb/aes_128_top_tb_
 add wave -radix hexadecimal -group AES_128 sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/*
 add wave -radix hexadecimal -group SUBBYTES_SHIFTROWS sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/subbytes_shiftrows/*
 add wave -radix hexadecimal -group MIXCOLUMS sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/mixcol/*
-add wave -radix hexadecimal -group CORE_CONTROL sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/aes_128_control_3val/*
-add wave -radix hexadecimal -group SINGLE_KEY_RAM sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/single_key/*
+#add wave -radix hexadecimal -group CORE_CONTROL sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/aes_128_control_3val/*
+#add wave -radix hexadecimal -group CORE_CONTROL sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/aes_128_control_4val/*
+#add wave -radix hexadecimal -group SWITCH_KEY_RAM sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/switch_key_ram/*
+#add wave -radix hexadecimal -group SWITCH_KEY_RAM sim:/aes_128_top_tb/aes_128_top_tb_tasks/aes_128_top/single_key_ram/*
 
 configure wave -signalnamewidth 1
 configure wave -namecolwidth 200
