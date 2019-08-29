@@ -47,7 +47,7 @@ logic		    in_en_collision_irq = 'b0;
  **************************************************************************************************/
 assign start = (idle) ? 1'b0 : (in_en | start_r);
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		round_count <= 6'b0;
 	else if (start)
@@ -56,17 +56,19 @@ always @(posedge clk)
 		round_count <= 6'b0;
 	else if (start_r)
 		round_count <= round_count + 6'b1;
+end
 
 /* en_mixcol - signal the disconnecting Mixcolums */
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		en_mixcol <= 1'b0;
 	else if (start)
 		en_mixcol <= 1'b0;
 	else if (round_count == 6'd35)
 		en_mixcol <= 1'b1;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		key_ready_r <= 1'b0;
 	else if ((round_count == 6'd1 | 		round_count == 6'd5 | 		round_count == 6'd9 | 		round_count == 6'd13 |
@@ -75,26 +77,29 @@ always @(posedge clk)
 		key_ready_r <= 1'b1;
 	else
 		key_ready_r <= 1'b0;
+end
 
 assign key_ready = key_ready_start | key_ready_r;
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		delay_start_r <= 2'b0;
 	else if (start_tr)
 		delay_start_r <= 2'b0;
 	else if (start)
 		delay_start_r <= delay_start_r + 2'b1;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		start_tr <= 1'b0;
 	else if (delay_start_r == 2'b1)
 		start_tr <= 1'b1;
 	else 
 		start_tr <= 1'b0;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		key_ready_start <= 1'b0;
 	else if (start & key_ready_start)
@@ -103,8 +108,9 @@ always @(posedge clk)
 		key_ready_start <= 1'b1;
 	else
 		key_ready_start <= 1'b0;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		flag_in_en <= 3'b0;
 	else if ((~start_r) & (~start_tr) & in_en & start)
@@ -113,48 +119,55 @@ always @(posedge clk)
 		flag_in_en <= flag_in_en + 3'b10;
 	else if (start_r & start_tr & in_en & start)
 		flag_in_en <= flag_in_en + 3'b100;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		out_en <= 1'b0;
 	else if ((round_count == 6'd38) | ((round_count == 6'd39) & ((flag_in_en >> 1) & 1)) | ((round_count == 6'd40) & ((flag_in_en >> 2) & 1)))
 		out_en <= 1'b1;
 	else
 		out_en <= 1'b0;
+end
 
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		start_r <= 1'b0;
 	else if (start)
 		start_r <= 1'b1;
 	else if (out_en)
 		start_r <= 1'b0;
+end
 
 /* idle - high level  - status AES_CALC, low level  - status AES_IDLE */
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		idle <= 1'b0;
 	else if (start_tr)
 		idle <= 1'b1;
 	else if (~(start_r | out_en))
 		idle <= 1'b0;
+end
 	
 /* in_en_collision_irq - flag double in_en */
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		in_en_collision_irq <= 1'b0;
 	else if (in_en & idle)
 		in_en_collision_irq <= 1'b1;
 	else if (in_en)
 		in_en_collision_irq <= 1'b0;
+end
 
 /* in_en_collision_irq_pulse - debug signal */
-always @(posedge clk)
+always_ff @(posedge clk) begin
 	if (kill)
 		in_en_collision_irq_pulse <= 1'b0;
 	else if (in_en_collision_irq)
 		in_en_collision_irq_pulse <= ~in_en_collision_irq_pulse;
 	else 
 		in_en_collision_irq_pulse <= 1'b0;
+end
+
 
 endmodule : aes_128_control_4clk
