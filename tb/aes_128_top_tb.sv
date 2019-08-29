@@ -22,7 +22,12 @@ initial begin
     aes_128_top_tb_tasks.set_data;
     aes_128_top_tb_tasks.set_data;
 
-    aes_128_top_tb_tasks.wait_n_clocks(200);
+    aes_128_top_tb_tasks.wait_n_clocks(100);
+
+    aes_128_top_tb_tasks.load_input_en;
+    aes_128_top_tb_tasks.load_input_data;
+    aes_128_top_tb_tasks.set_input_data(10);
+    aes_128_top_tb_tasks.wait_n_clocks(400);
 
     $display("END");
 	$stop;

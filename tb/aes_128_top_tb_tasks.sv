@@ -5,6 +5,7 @@ module aes_128_top_tb_tasks;
 
 parameter LENGTH_DATA   = 120;
 parameter LENGTH_KEY    = LENGTH_DATA * 11 * 2;
+parameter LENGTH_ENABLE = 100;
 
 /* input signal */
 logic                   clk;
@@ -30,6 +31,18 @@ logic                   out_en;
 logic   [127:0]         out_data;
 logic                   idle;
 logic                   in_en_collision_irq_pulse;
+
+
+logic   [15:0]          in_en_len;
+logic   [15:0]          in_data_len;
+
+/* Matlab data vector */
+logic   [1:0]           in_en_m [LENGTH_ENABLE-1:0];
+logic   [127:0]         in_data_m [LENGTH_DATA-1:0];
+
+/* Matlab files descriptors */
+integer                 in_en_fd;
+integer                 in_data_fd;
 
  /*************************************************************************************
  *            BLOCK INSTANCE                                                          *
@@ -112,7 +125,7 @@ task reset;
         kill <= 1'b1;
 
     kill <= 1'b0;
-endtask
+endtask : reset
 
 task wait_n_clocks;
 input integer N;
@@ -122,7 +135,7 @@ integer n;
         begin
            @(posedge clk);
         end   
-endtask
+endtask : wait_n_clocks
 
 task set_data;
 begin
@@ -135,7 +148,7 @@ begin
 
     $display("input data set\n"); 
 end
-endtask
+endtask : set_data
 
 task write_single_key_set;
 integer i;
@@ -152,7 +165,7 @@ begin
 
     $display("write new key set\n");
 end
-endtask
+endtask : write_single_key_set
 
 task write_double_key_set;
 input num_buf;
@@ -175,6 +188,96 @@ begin
 
     $display("write new key set, buffer = %d\n", num_buf);
 end
-endtask
+endtask :write_double_key_set
+
+task load_input_en;
+integer i;
+begin
+    in_en_fd = $fopen("../data/aes_128_enc_input_enable.dat", "r");
+        $fscanf(in_en_fd, "%d", in_en_len);
+
+    for (i = 0; i < in_en_len; i++)
+        $fscanf(in_en_fd, "%d", in_en_m[i]);
+
+    $fclose(in_en_fd);
+    $display("Vector input enable were written to memory\n");
+end
+endtask : load_input_en
+
+task load_input_data;
+integer i;
+begin
+    in_data_fd = $fopen("../data/aes_128_enc_input_data_hex.dat", "r");
+        $fscanf(in_data_fd, "%h", in_data_len);
+
+    for (i = 0; i < in_data_len; i++)
+        $fscanf(in_data_fd, "%h", in_data_m[i]);
+
+    $fclose(in_data_fd);
+    $display("Vector input data were written to memory\n");
+end
+endtask : load_input_data
+
+task set_input_data;
+input integer N;
+integer i;
+integer j;
+begin
+    i = 0;
+    j = 0;
+    while (i < N)
+        begin
+            unique case (in_en_m[j])
+            2'd1:   begin
+                        in_en <= 1'b1;
+                        in_data <= in_data_m[i];
+                        @(posedge clk);
+                        in_en <= 1'b0;
+                        in_data <= 128'b0;
+                        i++;
+                        repeat (4) @(posedge clk);
+                        while (idle)
+                            @(posedge clk);
+                    end
+
+            2'd2:   begin
+                        in_en <= 1'b1;
+                        in_data <= in_data_m[i];
+                        @(posedge clk);
+                        in_en <= 1'b0;
+                        in_data <= 128'b0;
+                        @(posedge clk);
+                        in_en <= 1'b1;
+                        in_data <= in_data_m[i + 1];
+                        @(posedge clk);
+                        in_en <= 1'b0;
+                        in_data <= 128'b0;
+                        i = i + 2;
+                        @(posedge clk);
+                        while (idle)
+                            @(posedge clk);
+                    end
+
+            2'd3:   begin
+                        in_en <= 1'b1;
+                        in_data <= in_data_m[i];
+                        @(posedge clk);
+                        in_data <= in_data_m[i + 1];
+                        @(posedge clk);
+                        in_data <= in_data_m[i + 2];
+                        @(posedge clk);
+                        in_en <= 1'b0;
+                        in_data <= 128'b0;
+                        i = i + 3;
+                        @(posedge clk);
+                        while (idle)
+                            @(posedge clk);
+                    end
+            endcase
+            j++;
+        end
+end
+endtask : set_input_data
+
 
 endmodule : aes_128_top_tb_tasks

@@ -33,6 +33,7 @@ module aes_128_control_3clk
  *      LOCAL PARAMETERS & VARIABLES                                                              *
  **************************************************************************************************/
 logic                       start_r 			= 'd0;
+logic						start_r1			= 'd0;
 logic                       start_tr 			= 'd0;
 logic                       key_ready_r 		= 'd0;
 logic   [1:0]               delay_start_r 		= 'd0;
@@ -128,10 +129,17 @@ end
 
 always_ff @(posedge clk) begin
 	if (kill)
+		start_r1 <= 1'b0;
+	else
+		start_r1 <= start_r;
+end
+
+always_ff @(posedge clk) begin
+	if (kill)
 		idle <= 1'b0;
 	else if (start_tr)
 		idle <= 1'b1;
-	else if (~(start_r | out_en))
+	else if (~start_r1)
 		idle <= 1'b0;
 end
 

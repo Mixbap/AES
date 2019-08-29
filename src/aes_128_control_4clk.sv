@@ -34,6 +34,7 @@ module aes_128_control_4clk (
  *      LOCAL PARAMETERS & VARIABLES                                                              *
  **************************************************************************************************/
 logic		    start_r             = 'b0;
+logic			start_r1			= 'b0;
 logic		    start_tr            = 'b0;
 logic		    key_ready_start     = 'b0;
 logic		    key_ready_r         = 'b0;
@@ -139,13 +140,20 @@ always_ff @(posedge clk) begin
 		start_r <= 1'b0;
 end
 
+always_ff @(posedge clk) begin
+	if (kill)
+		start_r1 <= 1'b0;
+	else
+		start_r1 <= start_r;
+end
+
 /* idle - high level  - status AES_CALC, low level  - status AES_IDLE */
 always_ff @(posedge clk) begin
 	if (kill)
 		idle <= 1'b0;
 	else if (start_tr)
 		idle <= 1'b1;
-	else if (~(start_r | out_en))
+	else if (~start_r1)
 		idle <= 1'b0;
 end
 	
