@@ -32,17 +32,22 @@ logic   [127:0]         out_data;
 logic                   idle;
 logic                   in_en_collision_irq_pulse;
 
-
 logic   [15:0]          in_en_len;
 logic   [15:0]          in_data_len;
+logic   [15:0]          keyset_len;
+logic   [15:0]          out_data_len;
 
 /* Matlab data vector */
 logic   [1:0]           in_en_m [LENGTH_ENABLE-1:0];
 logic   [127:0]         in_data_m [LENGTH_DATA-1:0];
+logic   [63:0]          keyset_m [LENGTH_KEY-1:0];
+logic   [127:0]         out_data_m [LENGTH_DATA-1:0];
 
 /* Matlab files descriptors */
 integer                 in_en_fd;
 integer                 in_data_fd;
+integer                 keyset_fd;
+integer                 out_data_fd;
 
  /*************************************************************************************
  *            BLOCK INSTANCE                                                          *
@@ -110,11 +115,23 @@ initial begin
 	double_key_set[42] <= 64'h174a94e37f1d1113;	    double_key_set[43] <= 64'hc5302b4d8ba707f3;
 
 
-    $display("input signals were initialized\n"); 
+    $display("Input signals were initialized\n"); 
 end
 
 initial forever begin
     #4000 clk = ~clk; // 125 MHz
+end
+
+/*************************************************************************************
+ *            LOGIC                                                                  *
+ *************************************************************************************/
+logic   [31:0]      in_en_count = 'd0;
+
+always_ff @(posedge clk) begin
+    if (kill)
+        in_en_count <= 32'd0;
+    else if (in_en)
+        in_en_count <= in_en_count + 32'b1;
 end
 
 /*************************************************************************************
@@ -146,10 +163,11 @@ begin
 	in_en <= 1'b0;
 	in_data <= 128'b0;
 
-    $display("input data set\n"); 
+    $display("Input data set\n"); 
 end
 endtask : set_data
 
+`ifdef ONE_KEY
 task write_single_key_set;
 integer i;
 begin
@@ -163,10 +181,12 @@ begin
     en_wr <= 1'b0;
     key_round_wr <= 128'b0;
 
-    $display("write new key set\n");
+    $display("Write new key set\n");
 end
 endtask : write_single_key_set
+`endif
 
+`ifdef TWO_KEY
 task write_double_key_set;
 input num_buf;
 integer i;
@@ -186,13 +206,15 @@ begin
     @(posedge clk);
     switch_key <= 1'b0;
 
-    $display("write new key set, buffer = %d\n", num_buf);
+    $display("Write new key set, buffer = %d\n", num_buf);
 end
 endtask :write_double_key_set
+`endif
 
-task load_input_en;
+task load_data_in_files;
 integer i;
 begin
+    /* Input enable */
     in_en_fd = $fopen("../data/aes_128_enc_input_enable.dat", "r");
         $fscanf(in_en_fd, "%d", in_en_len);
 
@@ -201,12 +223,8 @@ begin
 
     $fclose(in_en_fd);
     $display("Vector input enable were written to memory\n");
-end
-endtask : load_input_en
 
-task load_input_data;
-integer i;
-begin
+    /* Input data */
     in_data_fd = $fopen("../data/aes_128_enc_input_data_hex.dat", "r");
         $fscanf(in_data_fd, "%h", in_data_len);
 
@@ -215,69 +233,163 @@ begin
 
     $fclose(in_data_fd);
     $display("Vector input data were written to memory\n");
+
+    /* Keyset */
+    keyset_fd = $fopen("../data/aes_128_enc_key_hex.dat", "r");
+        $fscanf(keyset_fd, "%h", keyset_len);
+
+    for (i = 0; i < keyset_len; i++)
+        $fscanf(keyset_fd, "%h", keyset_m[i]);
+
+    $fclose(keyset_fd);
+    $display("Vector keyset were written to memory\n");
+
+    /* Output data */
+    out_data_fd = $fopen("../data/aes_128_enc_output_data_hex.dat", "r");
+        $fscanf(out_data_fd, "%h", out_data_len);
+
+    for (i = 0; i < out_data_len; i++)
+        $fscanf(out_data_fd, "%h", out_data_m[i]);
+
+    $fclose(out_data_fd);
+    $display("Vector output data were written to memory\n");    
 end
-endtask : load_input_data
+endtask : load_data_in_files
 
 task set_input_data;
-input integer N;
+input integer frame_count;
+input integer data_count;
+begin
+    unique case (in_en_m[frame_count])
+        2'd1:   begin
+                    in_en <= 1'b1;
+                    in_data <= in_data_m[data_count];
+                    @(posedge clk);
+                    in_en <= 1'b0;
+                    in_data <= 128'b0;
+                end
+
+        2'd2:   begin
+                    in_en <= 1'b1;
+                    in_data <= in_data_m[data_count];
+                    @(posedge clk);
+                    in_en <= 1'b0;
+                    in_data <= 128'b0;
+                    @(posedge clk);
+                    in_en <= 1'b1;
+                    in_data <= in_data_m[data_count + 1];
+                    @(posedge clk);
+                    in_en <= 1'b0;
+                    in_data <= 128'b0;
+                end
+
+        2'd3:   begin
+                    in_en <= 1'b1;
+                    in_data <= in_data_m[data_count];
+                    @(posedge clk);
+                    in_data <= in_data_m[data_count + 1];
+                    @(posedge clk);
+                    in_data <= in_data_m[data_count + 2];
+                    @(posedge clk);
+                    in_en <= 1'b0;
+                    in_data <= 128'b0;
+                end
+            endcase
+end
+endtask : set_input_data
+
+`ifdef ONE_KEY
+task set_keyset;
+input integer num_key;
+integer i;
+begin
+    @(posedge clk);
+    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i = i + 2)
+        begin
+            @(posedge clk);
+            en_wr <= 1'b1;
+            key_round_wr <= {keyset_m[i + 1], keyset_m[i]};
+        end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 128'b0;
+end
+endtask : set_keyset
+`endif
+
+`ifdef TWO_KEY
+task set_keyset;
+input integer num_key;
+integer i;
+begin
+    @(posedge clk);
+    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i++)
+        begin
+            @(posedge clk);
+            en_wr <= 1'b1;
+            key_round_wr <= keyset_m[i];
+        end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 64'b0;
+    switch_key <= 1'b1;
+    @(posedge clk);
+    switch_key <= 1'b0;
+end
+endtask : set_keyset
+`endif
+
+task check_out_data;
+input integer idx;
+output integer out_val;
 integer i;
 integer j;
 begin
-    i = 0;
     j = 0;
-    while (i < N)
+    out_val = 0;
+    while (out_en == 0)
+        @(posedge clk);
+
+    for (i = 0; i < 3; i++)
         begin
-            unique case (in_en_m[j])
-            2'd1:   begin
-                        in_en <= 1'b1;
-                        in_data <= in_data_m[i];
-                        @(posedge clk);
-                        in_en <= 1'b0;
-                        in_data <= 128'b0;
-                        i++;
-                        repeat (4) @(posedge clk);
-                        while (idle)
-                            @(posedge clk);
-                    end
-
-            2'd2:   begin
-                        in_en <= 1'b1;
-                        in_data <= in_data_m[i];
-                        @(posedge clk);
-                        in_en <= 1'b0;
-                        in_data <= 128'b0;
-                        @(posedge clk);
-                        in_en <= 1'b1;
-                        in_data <= in_data_m[i + 1];
-                        @(posedge clk);
-                        in_en <= 1'b0;
-                        in_data <= 128'b0;
-                        i = i + 2;
-                        @(posedge clk);
-                        while (idle)
-                            @(posedge clk);
-                    end
-
-            2'd3:   begin
-                        in_en <= 1'b1;
-                        in_data <= in_data_m[i];
-                        @(posedge clk);
-                        in_data <= in_data_m[i + 1];
-                        @(posedge clk);
-                        in_data <= in_data_m[i + 2];
-                        @(posedge clk);
-                        in_en <= 1'b0;
-                        in_data <= 128'b0;
-                        i = i + 3;
-                        @(posedge clk);
-                        while (idle)
-                            @(posedge clk);
-                    end
-            endcase
-            j++;
+            if (out_en && (out_data == out_data_m[idx + j]))
+                begin
+                    out_val++;
+                    j++;
+                    @(posedge clk);
+                end
+            else
+                @(posedge clk);
         end
 end
-endtask : set_input_data
+endtask : check_out_data
+
+task test_1;
+input integer frame_count;
+integer i;
+integer k;
+integer result;
+begin
+    k = 0;
+    result = 0;
+    for (i = 0; i < frame_count; i++)
+        begin
+            set_keyset(in_en_count);
+            wait_n_clocks(30);
+            fork
+                set_input_data(i, in_en_count);
+                check_out_data(in_en_count, k);
+            join
+            result = result + k;
+            wait_n_clocks(50);
+        end
+
+    if (result == in_en_count)
+        $display("\nTesbench successfully completed\n"); 
+    else
+        $display("\nTesbench failed, successful completions %d out for %d\n", result, in_en_count);
+end
+endtask : test_1
 
 
 endmodule : aes_128_top_tb_tasks
