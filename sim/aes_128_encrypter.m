@@ -56,13 +56,25 @@ clear
 
 %--------------------------------------------------------------------------
 %--------------------------------------------------------------------------
-%-----Generate random massive input data and keys--------------------------
 Input_data_frame = 100; %value frame
-[ Input_data_full, Key_AES_full ] = aes_128_gen_indata_key(Input_data_frame*128);
-Input_data_length = Input_data_frame*16;
 
 %----Generate random massive input enable----------------------------------
-Input_enable = randi([1 3], 1, Input_data_length);
+Input_enable = randi([1 3], 1, Input_data_frame);
+
+%----Calculation quantity enable-------------------------------------------
+Sum_enable = 0;
+for i = 1:Input_data_frame
+    Sum_enable = Sum_enable + Input_enable(i);
+    if (i == 1)
+        Mas_sum_enable(1) = Input_enable(1);
+    else
+        Mas_sum_enable(i) = Mas_sum_enable(i - 1) + Input_enable(i);
+    end
+end
+
+%-----Generate random massive input data and keys--------------------------
+[ Input_data_full, Key_AES_full ] = aes_128_gen_indata_key(Sum_enable*128, Input_data_frame*128);
+Input_data_length = Input_data_frame*16;
 
 %----Write input enable in file--------------------------------------------
 fen_in = fopen('../data/aes_128_enc_input_enable.dat', 'wb');
@@ -80,7 +92,7 @@ Input_data_hex_full = '';
 Key_AES_hex_full = '';
 
 
-for i = 0 : Input_data_frame - 1
+for i = 0 : Sum_enable - 1
     
     Input_data_matrix = aes_array_to_matrix(Input_data_full(128*i + 1 : 128*(i + 1)));
     Input_data_hex = aes_array128_to_hex_colums(Input_data_matrix);
@@ -90,16 +102,18 @@ for i = 0 : Input_data_frame - 1
     end
     Input_data_hex_full = [Input_data_hex_full  Input_data_hex_obr];
     Input_data_hex_obr = '';
-    
+end
+
+for i = 0 : Input_data_frame - 1
     Key_AES_matrix = aes_array_to_matrix(Key_AES_full(128*i + 1 : 128*(i + 1)));
     Key_AES_hex = aes_array128_to_hex_colums(Key_AES_matrix);
     Key_AES_hex_full = [Key_AES_hex_full Key_AES_hex];
 end
 %-------------------Write input data---------------------------------------
 fdata_in_hex = fopen('../data/aes_128_enc_input_data_hex.dat', 'wb');
-fprintf(fdata_in_hex, '%d\n', Input_data_frame);
+fprintf(fdata_in_hex, '%d\n', Sum_enable);
 
-for i = 0:Input_data_frame-1 
+for i = 0:Sum_enable-1 
 for n = 1:31
     fprintf(fdata_in_hex, '%c', Input_data_hex_full(32*i + n));
 end
@@ -126,13 +140,21 @@ fclose(fdata_in_hex);
 
 
 %-----Encryption data------------------------------------------------------
-for section = 0 : Input_data_length/16 - 1
+Key_AES = aes_array_to_matrix(Key_AES_full(1 : 128));
+Mas_sum_enable_idx = 1;
+
+for section = 0 : Sum_enable - 1
     
 Input_data = aes_array_to_matrix(Input_data_full(128*section + 1 : 128*(section + 1)));
 
 %--------------------------------------------------------------------------
 %If Key_AES generate random
-Key_AES = aes_array_to_matrix(Key_AES_full(128*section + 1 : 128*(section + 1)));
+if (section < Mas_sum_enable(Mas_sum_enable_idx))
+else
+    Key_AES = aes_array_to_matrix(Key_AES_full(128*Mas_sum_enable_idx + 1 : 128*(Mas_sum_enable_idx + 1)));
+    Mas_sum_enable_idx = Mas_sum_enable_idx + 1;
+end
+
 %--------------------------------------------------------------------------
 
 
@@ -213,7 +235,7 @@ end
 %----Write keys in file----------------------------------------------------
 RoundKey_hex_full = '';
 
-for i = 0 : Input_data_frame*11 - 1
+for i = 0 : Sum_enable*11 - 1
     
     RoundKey_matrix = aes_array_to_matrix(RoundKey_full(128*i + 1 : 128*(i + 1)));
     RoundKey_hex = aes_array128_to_hex_colums(RoundKey_matrix);
@@ -227,9 +249,9 @@ for i = 0 : Input_data_frame*11 - 1
 end
 
 fkey_hex = fopen('../data/aes_128_enc_key_hex.dat', 'wb');
-fprintf(fkey_hex, '%d\n', Input_data_frame*2*11);
+fprintf(fkey_hex, '%d\n', Sum_enable*2*11);
 
-for i = 1:2:Input_data_frame*2*11 
+for i = 1:2:Sum_enable*2*11 
     for n = 1:15
         fprintf(fkey_hex, '%c', RoundKey_hex_full(16*i + n));
     end
@@ -273,7 +295,7 @@ fclose(fdata_out);
 %--------------------------------------------------------------------------
 %-------------------Write output data hex----------------------------------
 Encrypted_Data_hex_full = '';
-for i = 0 : Input_data_frame - 1
+for i = 0 : Sum_enable - 1
     
     Encrypted_Data_full_matrix = aes_array_to_matrix(Encrypted_Data_full(128*i + 1 : 128*(i + 1)));
     Encrypted_Data_hex_f = aes_array128_to_hex_colums(Encrypted_Data_full_matrix);
@@ -288,9 +310,9 @@ for i = 0 : Input_data_frame - 1
 end
 
 fdata_out_hex = fopen('../data/aes_128_enc_output_data_hex.dat', 'wb');
-fprintf(fdata_out_hex, '%d\n', Input_data_frame);
+fprintf(fdata_out_hex, '%d\n', Sum_enable);
 
-for i = 0:Input_data_frame-1 
+for i = 0:Sum_enable-1 
 for n = 1:31
     fprintf(fdata_out_hex, '%c', Encrypted_Data_hex_full(32*i + n));
 end
