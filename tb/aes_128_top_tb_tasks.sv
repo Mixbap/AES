@@ -167,50 +167,6 @@ begin
 end
 endtask : set_data
 
-`ifdef ONE_KEY
-task write_single_key_set;
-integer i;
-begin
-    for (i = 0; i < 11; i = i + 1)
-    begin
-        @(posedge clk);
-        en_wr <= 1'b1;
-        key_round_wr <= single_key_set[i];
-    end
-    @(posedge clk);
-    en_wr <= 1'b0;
-    key_round_wr <= 128'b0;
-
-    $display("Write new key set\n");
-end
-endtask : write_single_key_set
-`endif
-
-`ifdef TWO_KEY
-task write_double_key_set;
-input num_buf;
-integer i;
-begin
-    for (i = 0; i < 22; i = i + 1)
-    begin
-        @(posedge clk);
-        en_wr <= 1'b1;
-        key_round_wr <= double_key_set[i + num_buf*22];
-    end
-    @(posedge clk);
-    en_wr <= 1'b0;
-    key_round_wr <= 64'b0;
-
-    @(posedge clk);
-    switch_key <= 1'b1;
-    @(posedge clk);
-    switch_key <= 1'b0;
-
-    $display("Write new key set, buffer = %d\n", num_buf);
-end
-endtask :write_double_key_set
-`endif
-
 task load_data_in_files;
 integer i;
 begin
@@ -298,47 +254,6 @@ begin
 end
 endtask : set_input_data
 
-`ifdef ONE_KEY
-task set_keyset;
-input integer num_key;
-integer i;
-begin
-    @(posedge clk);
-    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i = i + 2)
-        begin
-            @(posedge clk);
-            en_wr <= 1'b1;
-            key_round_wr <= {keyset_m[i + 1], keyset_m[i]};
-        end
-    @(posedge clk);
-    en_wr <= 1'b0;
-    key_round_wr <= 128'b0;
-end
-endtask : set_keyset
-`endif
-
-`ifdef TWO_KEY
-task set_keyset;
-input integer num_key;
-integer i;
-begin
-    @(posedge clk);
-    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i++)
-        begin
-            @(posedge clk);
-            en_wr <= 1'b1;
-            key_round_wr <= keyset_m[i];
-        end
-    @(posedge clk);
-    en_wr <= 1'b0;
-    key_round_wr <= 64'b0;
-    switch_key <= 1'b1;
-    @(posedge clk);
-    switch_key <= 1'b0;
-end
-endtask : set_keyset
-`endif
-
 task check_out_data;
 input integer idx;
 output integer out_val;
@@ -390,6 +305,93 @@ begin
         $display("\nTesbench failed, successful completions %d out for %d\n", result, in_en_count);
 end
 endtask : test_1
+
+/*************************************************************************************
+ *            ONE KEY TASKS                                                          *
+ *************************************************************************************/
+`ifdef ONE_KEY
+task write_keyset;
+integer i;
+begin
+    for (i = 0; i < 11; i = i + 1)
+    begin
+        @(posedge clk);
+        en_wr <= 1'b1;
+        key_round_wr <= single_key_set[i];
+    end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 128'b0;
+
+    $display("Write new key set\n");
+end
+endtask : write_keyset
+
+task set_keyset;
+input integer num_key;
+integer i;
+begin
+    @(posedge clk);
+    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i = i + 2)
+        begin
+            @(posedge clk);
+            en_wr <= 1'b1;
+            key_round_wr <= {keyset_m[i + 1], keyset_m[i]};
+        end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 128'b0;
+end
+endtask : set_keyset
+`endif
+
+/*************************************************************************************
+ *            TWO KEY TASKS                                                          *
+ *************************************************************************************/
+`ifdef TWO_KEY
+task write_keyset;
+input num_buf;
+integer i;
+begin
+    for (i = 0; i < 22; i = i + 1)
+    begin
+        @(posedge clk);
+        en_wr <= 1'b1;
+        key_round_wr <= double_key_set[i + num_buf*22];
+    end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 64'b0;
+
+    @(posedge clk);
+    switch_key <= 1'b1;
+    @(posedge clk);
+    switch_key <= 1'b0;
+
+    $display("Write new key set, buffer = %d\n", num_buf);
+end
+endtask : write_keyset
+
+task set_keyset;
+input integer num_key;
+integer i;
+begin
+    @(posedge clk);
+    for (i = num_key*11*2; i < ((num_key + 1)*11*2); i++)
+        begin
+            @(posedge clk);
+            en_wr <= 1'b1;
+            key_round_wr <= keyset_m[i];
+        end
+    @(posedge clk);
+    en_wr <= 1'b0;
+    key_round_wr <= 64'b0;
+    switch_key <= 1'b1;
+    @(posedge clk);
+    switch_key <= 1'b0;
+end
+endtask : set_keyset
+`endif
 
 
 endmodule : aes_128_top_tb_tasks
